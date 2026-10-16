@@ -1,0 +1,79 @@
+# ============================================================
+# Contact Form — root .htaccess
+# Makes public/ the effective web root for non-Docker setups
+# (XAMPP, WAMP, MAMP, native LAMP). Ignored by Docker because
+# DocumentRoot is already set to public/ in the Dockerfile.
+# ============================================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Rewrite everything into public/ unless it's already under public/
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+
+    # Block access to dotfiles anywhere in the path
+    RewriteRule "(^|/)\.(?!well-known/)" - [F]
+</IfModule>
+
+# ------------------------------------------------------------
+# Block sensitive file types over HTTP
+#
+# Denies: env files, SQL dumps, docs, config, logs, backups,
+#         composer metadata, database files, source maps,
+#         editor swap files, and OS metadata.
+# ------------------------------------------------------------
+<FilesMatch "(?i)\.(env.*|sql|sqlite|db|md|json|lock|ini|log|bak|backup|old|orig|swp|swo|tmp|dist|map|ya?ml)$">
+    Require all denied
+</FilesMatch>
+
+# Also block common dotfiles that don't match the above
+<FilesMatch "^\.(env|git|htaccess|htpasswd|DS_Store|editorconfig|gitignore|dockerignore)$">
+    Require all denied
+</FilesMatch>
+
+# ------------------------------------------------------------
+# Block files with no extension, or dangerous extensions
+# (.php in an uploads directory could be executed)
+# ------------------------------------------------------------
+<FilesMatch "(?i)\.(php[0-9]?|phtml|pht|phar|shtml|cgi|pl|py|rb|sh|asp|aspx|jsp)$">
+    <If "%{REQUEST_URI} =~ m#^.*/uploads/#">
+        Require all denied
+    </If>
+</FilesMatch>
+
+# ------------------------------------------------------------
+# Disable directory listing and MultiViews
+# ------------------------------------------------------------
+Options -Indexes -MultiViews
+
+# ------------------------------------------------------------
+# If an uploads folder ever exists, force downloads instead of
+# execution and never serve HTML from there.
+# ------------------------------------------------------------
+<IfModule mod_headers.c>
+    <If "%{REQUEST_URI} =~ m#^.*/uploads/#">
+        Header set Content-Disposition "attachment"
+        Header set X-Content-Type-Options "nosniff"
+    </If>
+</IfModule>
+
+# ------------------------------------------------------------
+# Security headers (safe defaults for a contact form app)
+# ------------------------------------------------------------
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    # Uncomment once you've verified the CSP works for your assets:
+    # Header always set Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+</IfModule>
+
+# ------------------------------------------------------------
+# Disable PHP execution from non-public directories if this
+# .htaccess is inside the web root
+# ------------------------------------------------------------
+<FilesMatch "\.php$">
+    # This is a placeholder — real protection comes from the
+    # DocumentRoot pointing at public/. Do not rely on this alone.
+</FilesMatch>

@@ -1,0 +1,15 @@
+# Environment
+.env
+
+# Docker
+.docker/data/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
