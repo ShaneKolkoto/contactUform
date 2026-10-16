@@ -1,0 +1,23 @@
+# ============================================================
+# public/.htaccess — extensionless URLs
+# Lives inside the DocumentRoot in both Docker and non-Docker
+# setups, so Apache reads it everywhere.
+# ============================================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # /entries → entries.php, /submit → submit.php, etc.
+    # Only fires when no real file or directory matches.
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME}\.php -f
+    RewriteRule ^([^\.]+)/?$ $1.php [NC,L]
+
+    # Block dotfiles (belt-and-braces — root .htaccess also does this)
+    RewriteRule "(^|/)\.(?!well-known/)" - [F]
+</IfModule>
+
+# Block sensitive extensions even if someone reaches public/
+<FilesMatch "(?i)\.(env.*|sql|sqlite|db|md|json|lock|ini|log|bak|backup|old|orig|swp|swo|tmp|dist|map|ya?ml)$">
+    Require all denied
+</FilesMatch>

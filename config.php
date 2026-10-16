@@ -10,7 +10,7 @@ return [
     'app' => [
         'env'   => $env('APP_ENV', 'production'),
         'debug' => filter_var($env('APP_DEBUG', 'false'), FILTER_VALIDATE_BOOL),
-        'name'  => $env('APP_NAME', 'Acme Contact'),
+        'name'  => $env('APP_NAME', 'WeContactU'),
     ],
 
     'database' => [
