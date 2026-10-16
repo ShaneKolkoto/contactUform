@@ -7,9 +7,9 @@ on:
 jobs:
   lint:
     name: Lint PHP
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
@@ -32,7 +32,7 @@ jobs:
           exit $fail
   test:
     name: Run tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: lint
 
     services:
@@ -61,7 +61,7 @@ jobs:
       DB_PASS: apppassword
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
@@ -78,10 +78,10 @@ jobs:
         run: php tests/run.php
   docker:
     name: Build and smoke-test Docker
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build image
         run: docker compose build
@@ -107,11 +107,29 @@ jobs:
 
       - name: Smoke test
         run: |
-          # Give Apache a moment to boot
           sleep 3
 
-          # Homepage should return 200
+          echo "=== Container status ==="
+          docker compose ps
+
+          echo "=== /var/www/html contents ==="
+          docker compose exec -T web ls -la /var/www/html/
+
+          echo "=== /var/www/html/public contents ==="
+          docker compose exec -T web ls -la /var/www/html/public/
+
+          echo "=== Apache DocumentRoot ==="
+          docker compose exec -T web grep -i "DocumentRoot" /etc/apache2/sites-available/000-default.conf
+
+          echo "=== Apache error log ==="
+          docker compose logs web | tail -50
+
+          echo "=== curl -v http://localhost:8080/ ==="
+          curl -v http://localhost:8080/
+
+          echo "=== Homepage should return 200 ==="
           curl -fsS http://localhost:8080/ > /dev/null
+
 
           # Extensionless URL should work
           curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:8080/index | grep -q '^200$'
