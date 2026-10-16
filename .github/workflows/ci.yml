@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    name: Lint PHP
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, mbstring
+          coverage: none
+
+      - name: Check syntax of every PHP file
+        run: |
+          set -e
+          fail=0
+          while IFS= read -r file; do
+            output=$(php -l "$file" 2>&1)
+            if [ $? -ne 0 ]; then
+              echo "$output"
+              fail=1
+            fi
+          done < <(find . -type f -name '*.php' -not -path './vendor/*')
+          exit $fail
+
+  test:
+    name: Run tests
+    runs-on: ubuntu-24.04
+    needs: lint
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: contact_form
+          MYSQL_USER: appuser
+          MYSQL_PASSWORD: apppassword
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      APP_ENV: testing
+      APP_DEBUG: 'true'
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_NAME: contact_form
+      DB_USER: appuser
+      DB_PASS: apppassword
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, mbstring
+          coverage: none
+
+      - name: Load schema and seed data
+        run: |
+          mysql -h 127.0.0.1 -uappuser -papppassword contact_form < db/init.sql
+
+      - name: Run test suite
+        run: php tests/run.php
+
+  docker:
+    name: Build and smoke-test Docker
+    runs-on: ubuntu-24.04
+    needs: test
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build image
+        run: docker compose build
+
+      - name: Start stack
+        run: |
+          cp .env.example .env
+          docker compose up -d
+
+      - name: Wait for MySQL to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose exec -T db mysqladmin ping -h 127.0.0.1 -uroot -proot --silent > /dev/null 2>&1; then
+              echo "MySQL is up"
+              exit 0
+            fi
+            echo "Waiting for MySQL… ($i)"
+            sleep 2
+          done
+          echo "MySQL did not come up in time"
+          docker compose logs db
+          exit 1
+
+      - name: Smoke test
+        run: |
+          sleep 3
+
+          echo "=== Container status ==="
+          docker compose ps
+
+          echo "=== Homepage returns 200 ==="
+          curl -fsS http://localhost:8080/ > /dev/null
+
+          echo "=== Sensitive files are not reachable ==="
+          for path in .env config.php db/init.sql bootstrap.php; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:8080/$path")
+            if [ "$code" = "200" ]; then
+              echo "LEAK: /$path returned 200"
+              exit 1
+            fi
+            echo "  /$path → $code"
+          done
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
