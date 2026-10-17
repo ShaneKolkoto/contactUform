@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/components/form-field.php';
+require_once __DIR__ . '/components/alert.php';
+require_once __DIR__ . '/components/button.php';
+require_once __DIR__ . '/components/empty-state.php';
+
 $pageTitle = $pageTitle ?? 'Contact';
 $active = $active ?? '';
 $flash = flash_get();
