@@ -55,23 +55,21 @@ final class EntryRepository
     }
 
     /**
-     * Returns entries matching an optional search term and time range,
-     * newest first, with pagination.
-     *
-     * @param string|null $search  Matches name, email, or message (LIKE)
-     * @param int         $days    Restrict to the last N days (0 = no filter)
-     * @return array<int, array<string, mixed>>
+     * @param string|null $search
+     * @param int         $days
+     * @param string      $sort   One of: newest, oldest, name_asc, name_desc
      */
-    public function search(?string $search, int $days, int $limit, int $offset): array
+    public function search(?string $search, int $days, string $sort, int $limit, int $offset): array
     {
         [$where, $params] = $this->buildWhereClause($search, $days);
+        $order = $this->buildOrderClause($sort);
 
         $limit = max(1, min(500, $limit));
         $offset = max(0, $offset);
 
         $sql = 'SELECT id, name, email, phone, message, created_at
                 FROM entries' . $where . '
-                ORDER BY created_at DESC
+                ORDER BY ' . $order . '
                 LIMIT :limit OFFSET :offset';
 
         $statement = $this->pdo->prepare($sql);
@@ -87,9 +85,6 @@ final class EntryRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * Counts entries matching the same filter conditions as search().
-     */
     public function searchCount(?string $search, int $days): int
     {
         [$where, $params] = $this->buildWhereClause($search, $days);
@@ -106,13 +101,31 @@ final class EntryRepository
     }
 
     /**
-     * Builds a WHERE clause from search and day-range filters.
-     *
-     * Uses three distinct parameter names (:search_name, :search_email,
-     * :search_message) instead of reusing :search. With
-     * PDO::ATTR_EMULATE_PREPARES => false, MySQL 8 rejects the same named
-     * parameter appearing multiple times in one statement (HY093).
-     *
+     * @param string|null $search
+     * @param int         $days
+     * @param string      $sort   One of: newest, oldest, name_asc, name_desc
+     */
+    public function exportAll(?string $search, int $days, string $sort): array
+    {
+        [$where, $params] = $this->buildWhereClause($search, $days);
+        $order = $this->buildOrderClause($sort);
+
+        $sql = 'SELECT id, name, email, phone, message, created_at
+                FROM entries' . $where . '
+                ORDER BY ' . $order;
+
+        $statement = $this->pdo->prepare($sql);
+
+        foreach ($params as $name => $value) {
+            $statement->bindValue($name, $value, PDO::PARAM_STR);
+        }
+
+        $statement->execute();
+
+        return $statement->fetchAll();
+    }
+
+    /**
      * @return array{0:string, 1:array<string,string>}
      */
     private function buildWhereClause(?string $search, int $days): array
@@ -137,6 +150,23 @@ final class EntryRepository
         return [$where, $params];
     }
 
+    /**
+     * Maps a whitelisted sort key to a safe ORDER BY clause.
+     * Never interpolate user input directly into ORDER BY — SQL injection
+     * via ORDER BY is possible when values aren't whitelisted.
+     */
+    private function buildOrderClause(string $sort): string
+    {
+        $map = [
+            'newest'    => 'created_at DESC',
+            'oldest'    => 'created_at ASC',
+            'name_asc'  => 'name ASC, created_at DESC',
+            'name_desc' => 'name DESC, created_at DESC',
+        ];
+
+        return $map[$sort] ?? $map['newest'];
+    }
+
     public function count(): int
     {
         return (int) $this->pdo->query('SELECT COUNT(*) FROM entries')->fetchColumn();
@@ -158,4 +188,6 @@ final class EntryRepository
 
         return $row === false ? null : $row;
     }
+
+    
 }

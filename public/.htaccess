@@ -9,8 +9,10 @@
 
     # /entries → entries.php, /submit → submit.php, etc.
     # Only fires when no real file or directory matches.
+    # We exclude 404.php so the error handler is always reachable.
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME}\.php -f
+    RewriteCond %{REQUEST_URI} !^/404\.php$
     RewriteRule ^([^\.]+)/?$ $1.php [NC,L]
 
     # Block dotfiles (belt-and-braces — root .htaccess also does this)
@@ -22,4 +24,5 @@
     Require all denied
 </FilesMatch>
 
+# Route 404s to our custom page
 ErrorDocument 404 /404.php

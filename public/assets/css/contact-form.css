@@ -265,3 +265,18 @@
     outline: none;
     box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.15);
 }
+
+/* ============================================================
+   Button Loading State
+   ============================================================ */
+
+.btn.is-loading {
+    opacity: 0.8;
+    cursor: wait;
+    pointer-events: none;
+}
+
+/* Adjust spinner animation speed if needed */
+.btn .btn__spinner {
+    animation-duration: 0.8s;
+}

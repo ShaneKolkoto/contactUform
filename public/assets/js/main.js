@@ -1,5 +1,6 @@
 (function () {
     'use strict';
+
     const RULES = {
         name: {
             test: (v) => v.length >= 2 && v.length <= 100 && /^[\p{L}\p{M}\s'\-\.]+$/u.test(v),
@@ -147,53 +148,70 @@
     function initSubmitLock() {
         const form = document.getElementById('contact-form');
         const submitBtn = document.getElementById('submit-btn');
+
         if (!form || !submitBtn) return;
 
-        form.addEventListener('submit', (e) => {
-            // Prevent double-submits
-            if (submitBtn.disabled) {
-                e.preventDefault();
+        form.addEventListener('submit', function (event) {
+            // If the browser's built-in validation is going to stop this
+            // (e.g., required field empty, bad email), do not show the spinner.
+            // The browser will handle it.
+            if (!form.checkValidity()) {
                 return;
             }
 
-            // Validate everything client-side first
-            const fields = ['name', 'email', 'phone', 'message'];
-            let firstInvalid = null;
-
-            fields.forEach((fieldName) => {
-                const input = form.querySelector(`[name="${fieldName}"]`);
-                if (!input) return;
-
-                const value = input.value.trim();
-                const rule = RULES[fieldName];
-
-                if (value === '' || !rule.test(value)) {
-                    markInvalid(input, rule.message);
-                    if (!firstInvalid) firstInvalid = input;
-                }
-            });
-
-            if (firstInvalid) {
-                e.preventDefault();
-                firstInvalid.focus();
-                firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                return;
-            }
-
-            // All good — lock the button and show the spinner
+            // Lock the button
             submitBtn.disabled = true;
-            const spinner = submitBtn.querySelector('.btn__spinner');
-            const label = submitBtn.querySelector('.btn__label');
-            if (spinner) spinner.classList.remove('d-none');
-            if (label) label.textContent = 'Sending…';
+            submitBtn.classList.add('is-loading');
 
-            // Safety: re-enable after 15s in case the network hangs
-            // and the browser's back button returns to this page
-            setTimeout(() => {
+            // Swap the label
+            const label = submitBtn.querySelector('.btn__label');
+            if (label) {
+                label.textContent = 'Sending…';
+            }
+
+            // Show the spinner
+            const spinner = submitBtn.querySelector('.btn__spinner');
+            if (spinner) {
+                spinner.classList.remove('d-none');
+            }
+
+            // Safety net: if the server hangs or something crashes, don't
+            // leave the user stuck forever. Re-enable after 15 seconds.
+            setTimeout(function () {
                 submitBtn.disabled = false;
-                if (spinner) spinner.classList.add('d-none');
+                submitBtn.classList.remove('is-loading');
                 if (label) label.textContent = 'Submit';
+                if (spinner) spinner.classList.add('d-none');
             }, 15000);
+        });
+    }
+
+    // --------------------------------------------------------
+    // Filter form — show loading state on submit
+    // --------------------------------------------------------
+    function initFilterLock() {
+        const form = document.getElementById('filter-form');
+        const filterBtn = document.getElementById('filter-btn');
+
+        if (!form || !filterBtn) return;
+
+        form.addEventListener('submit', function () {
+            if (!form.checkValidity()) {
+                return;
+            }
+
+            filterBtn.disabled = true;
+            filterBtn.classList.add('is-loading');
+
+            const label = filterBtn.querySelector('.btn__label');
+            if (label) {
+                label.textContent = 'Filtering…';
+            }
+
+            const spinner = filterBtn.querySelector('.btn__spinner');
+            if (spinner) {
+                spinner.classList.remove('d-none');
+            }
         });
     }
 
@@ -218,6 +236,7 @@
         initCharCounter();
         initInlineValidation();
         initSubmitLock();
+        initFilterLock();
         initErrorFocus();
     }
 
