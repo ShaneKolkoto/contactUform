@@ -15,15 +15,35 @@ dependency-free, deployment-agnostic, and tested.
 
 ---
 
-## Screenshots
+## Table of Contents
 
-| Contact form | Entries list |
-|---|---|
-| _(add `docs/screenshots/contact.png`)_ | _(add `docs/screenshots/entries.png`)_ |
-
-| Mobile contact | Error state |
-|---|---|
-| _(add `docs/screenshots/contact-mobile.png`)_ | _(add `docs/screenshots/errors.png`)_ |
+- [Getting started](#getting-started)
+  - [Clone the repository](#clone-the-repository)
+  - [Prerequisites](#prerequisites)
+- [What's in here](#whats-in-here)
+- [Running the project](#running-the-project)
+  - [Option 1 — Docker (recommended)](#option-1--docker-recommended)
+  - [Option 2 — XAMPP / WAMP / MAMP](#option-2--xampp--wamp--mamp)
+  - [Option 3 — Shared hosting / cPanel](#option-3--shared-hosting--cpanel)
+- [Working with Docker](#working-with-docker)
+  - [Container status](#container-status)
+  - [Logs](#logs)
+  - [Opening a shell](#opening-a-shell)
+  - [Restarting services](#restarting-services)
+  - [Stopping](#stopping)
+  - [Rebuilding after Dockerfile changes](#rebuilding-after-dockerfile-changes)
+  - [Database commands](#database-commands)
+  - [Seeding and resetting data](#seeding-and-resetting-data)
+  - [Common troubleshooting](#common-troubleshooting)
+- [Makefile](#makefile)
+- [Configuration](#configuration)
+- [Project layout](#project-layout)
+- [Running the tests](#running-the-tests)
+- [Design decisions](#design-decisions)
+- [Things I'd improve with more time](#things-id-improve-with-more-time)
+- [Security notes](#security-notes)
+- [Screenshots](#screenshots)
+- [Author](#author)
 
 ---
 
@@ -59,7 +79,10 @@ php -m | grep -E 'pdo_mysql|mbstring'
 
 - **Contact form** — name, email, South African phone number, message
 - **Validation** — server-side (source of truth) and client-side (UX polish)
-- **Entries page** — lists everything that's been submitted, newest first
+- **Rate limiting** — 5 submissions per IP per 15 minutes
+- **Entries page** — searchable, filterable, sortable, paginated list of submissions
+- **Export** — CSV download of entries, respecting the active filters
+- **Accessibility** — WCAG 2.1 AA: skip link, focus rings, ARIA on forms and pagination
 - **MySQL storage** — schema + seed data in `db/init.sql`
 - **Test suite** — zero-dependency runner; unit tests + HTTP tests
 - **Docker** — one-command local setup; also runs on XAMPP and shared hosting
@@ -119,6 +142,8 @@ public_html/               ← upload the contents of /public here
 ├── index.php
 ├── submit.php
 ├── entries.php
+├── export.php
+├── 404.php
 └── assets/
 
 contactUform/              ← upload the rest here, one level above public_html
@@ -181,9 +206,6 @@ docker compose exec web bash      # shell into the web container
 docker compose exec db bash       # shell into the MySQL container
 ```
 
-Once inside, you can run `php`, `composer` (not installed), `ls`, `cat`,
-and so on as if it were a normal Linux shell.
-
 ### Restarting services
 
 ```bash
@@ -193,8 +215,7 @@ docker compose up -d --force-recreate web  # recreate after compose file changes
 ```
 
 **Note:** `restart` does not pick up changes to `docker-compose.yml`. If
-you edit the compose file (add a volume, change an env var, etc.), use
-`up -d --force-recreate` instead.
+you edit the compose file, use `up -d --force-recreate` instead.
 
 ### Stopping
 
@@ -211,25 +232,20 @@ After `docker compose down -v`, the next `docker compose up -d` re-runs
 
 ```bash
 docker compose build web          # rebuild the web image
-docker compose build --no-cache web  # rebuild from scratch (no layer cache)
+docker compose build --no-cache web  # rebuild from scratch
 docker compose up -d --force-recreate web
 ```
 
 You **don't** need to rebuild for normal code changes — the volumes mount
 your local files. Rebuild only when you change `docker/php/Dockerfile`.
 
----
-
 ### Database commands
 
-Three ways to talk to MySQL in this project. All are useful — pick whichever
-matches what you're doing.
+Three ways to talk to MySQL in this project.
 
 #### 1. phpMyAdmin (GUI)
 
 Open `http://localhost:8081` and log in as `appuser` / `apppassword`.
-
-Best for: browsing the schema, running ad-hoc queries, eyeballing data.
 
 #### 2. MySQL shell (CLI)
 
@@ -237,7 +253,7 @@ Best for: browsing the schema, running ad-hoc queries, eyeballing data.
 docker compose exec db mysql -uappuser -papppassword contact_form
 ```
 
-Inside the shell:
+Inside:
 
 ```sql
 SHOW TABLES;
@@ -247,22 +263,13 @@ SELECT id, name, phone, created_at FROM entries ORDER BY id DESC LIMIT 5;
 EXIT;
 ```
 
-Best for: running SQL without leaving the terminal, debugging a specific
-query.
-
 #### 3. One-shot queries
-
-For a single query, without opening a shell:
 
 ```bash
 docker compose exec db mysql -uappuser -papppassword contact_form -e "
   SELECT id, name, phone, created_at FROM entries ORDER BY id DESC LIMIT 5;
 "
 ```
-
-Use this in scripts, tests, or when you just want to check something quickly.
-
----
 
 ### Seeding and resetting data
 
@@ -280,19 +287,15 @@ docker compose exec db mysql -uappuser -papppassword contact_form -e "
 docker compose exec -T db mysql -uappuser -papppassword contact_form < db/init.sql
 ```
 
-The `-T` flag is required — without it, stdin redirect (`<`) doesn't work
-through `docker compose exec`.
+The `-T` flag is required — without it, stdin redirect (`<`) doesn't work.
 
-**Delete all rows but keep the schema** (useful for testing the empty state
-on the entries page):
+**Delete all rows but keep the schema:**
 
 ```bash
 docker compose exec db mysql -uappuser -papppassword contact_form -e "
   TRUNCATE TABLE entries;
 "
 ```
-
-Then restore the seed data with the `init.sql` command above.
 
 **Backup the current data to a file:**
 
@@ -306,33 +309,29 @@ docker compose exec db mysqldump -uappuser -papppassword contact_form entries > 
 docker compose exec -T db mysql -uappuser -papppassword contact_form < backup.sql
 ```
 
----
-
 ### Common troubleshooting
 
 **"Port 8080 is already in use"**
 
-Something else is listening on 8080. Change `WEB_PORT` in `.env` (e.g. to
-`8090`) and restart:
+Change `WEB_PORT` in `.env` (e.g. to `8090`) and restart:
 
 ```bash
 docker compose down
 docker compose up -d
 ```
 
-The app will be at `http://localhost:8090` instead.
-
 **"Access denied for user 'appuser'"**
 
-The MySQL volume was initialized with a different password. Either:
+The MySQL volume was initialized with a different password. Either use
+the password from `.env`, or wipe and rebuild:
 
-1. Use the password from `.env` (check `MYSQL_PASSWORD`)
-2. Or wipe and rebuild: `docker compose down -v && docker compose up -d`
+```bash
+docker compose down -v && docker compose up -d
+```
 
 **"Class 'App\...' not found"**
 
-The file in `src/` is either missing, empty (0 bytes), or has a syntax error.
-Check:
+The file in `src/` is either missing, empty (0 bytes), or has a syntax error:
 
 ```bash
 docker compose exec web ls -la /var/www/html/src/
@@ -341,10 +340,8 @@ docker compose exec web php -l /var/www/html/src/SomeClass.php
 
 **Changes not showing up**
 
-If you edited PHP/CSS/JS and the browser still shows old content:
-
-1. Hard refresh (`Ctrl+Shift+R` / `Cmd+Shift+R`)
-2. If the container can't see the files: `docker compose exec web ls /var/www/html/public/`
+1. Hard refresh (`Ctrl+Shift+R`)
+2. Check the container can see the files: `docker compose exec web ls /var/www/html/public/`
 3. If files are missing, check `docker-compose.yml` has the right volume mount
 
 ---
@@ -354,27 +351,6 @@ If you edited PHP/CSS/JS and the browser still shows old content:
 The project includes a `Makefile` — a set of shortcuts for the Docker
 commands you'd otherwise type in full. It's optional (the app works fine
 without it), but it saves keystrokes on the commands you run most often.
-
-### Why a Makefile?
-
-1. **Discoverability.** Run `make` (or `make help`) and you get a list of
-   available commands with descriptions. New contributors don't have to
-   read the Docker section to know what to do.
-2. **Consistency.** Everyone runs the same commands with the same flags.
-   No "did you run it with `-d` or without?" conversations.
-3. **Fewer typos.** `make test` is easier to remember than
-   `docker compose exec web php tests/run.php`.
-
-### Installing `make`
-
-`make` is preinstalled on macOS and most Linux distributions. On Windows:
-
-- **Git Bash** — usually has it via `mingw32-make`
-- **WSL2** — `sudo apt install make` inside your WSL environment
-- **Chocolatey** — `choco install make`
-
-If you don't have it and don't want to install it, just use the full
-`docker compose` commands from the sections above.
 
 ### Available targets
 
@@ -399,8 +375,6 @@ make help          # List all available targets
 
 ### Example workflow
 
-A typical session looks like:
-
 ```bash
 # First time
 cp .env.example .env
@@ -417,8 +391,6 @@ make test-all      # both at once
 
 # Check something in the DB
 make db            # opens MySQL shell
-# ... SELECT * FROM entries; ...
-# EXIT;
 
 # Done for the day
 make down
@@ -426,7 +398,7 @@ make down
 
 ### If `make` isn't available
 
-Every target maps to a plain Docker command. For example:
+Every target maps to a plain Docker command:
 
 | `make` target | Equivalent command |
 |---|---|
@@ -439,9 +411,6 @@ Every target maps to a plain Docker command. For example:
 | `make db` | `docker compose exec db mysql -uappuser -papppassword contact_form` |
 | `make seed` | `docker compose exec -T db mysql -uappuser -papppassword contact_form < db/init.sql` |
 | `make fresh` | `docker compose down -v && docker compose up -d` |
-
-So you're never blocked — the Makefile is a convenience layer, not a
-dependency.
 
 ---
 
@@ -463,8 +432,7 @@ Config lives in `config.php`. Values resolve in this order:
 | `DB_USER` | `root` | MySQL user |
 | `DB_PASS` | *(empty)* | MySQL password |
 
-**Never commit `.env`.** It's gitignored. `.env.example` is the template —
-copy it and edit.
+**Never commit `.env`.** It's gitignored. `.env.example` is the template.
 
 ---
 
@@ -486,16 +454,19 @@ contactUform/
 │   └── php/Dockerfile        # php:8.3-apache + pdo_mysql + mbstring
 │
 ├── public/                   # web root — the only thing served over HTTP
-│   ├── index.php
-│   ├── submit.php
-│   ├── entries.php
+│   ├── index.php             # contact form
+│   ├── submit.php            # POST handler
+│   ├── entries.php           # entries list with search/filter/sort/pagination
+│   ├── export.php            # CSV export (filter-aware)
+│   ├── 404.php               # custom 404 page
+│   ├── .htaccess             # extensionless URLs + ErrorDocument
 │   └── assets/
 │       ├── css/
-│       │   ├── style.css
+│       │   ├── style.css     # global theme
 │       │   ├── contact-form.css
 │       │   └── entries.css
 │       ├── js/
-│       │   └── app.js
+│       │   └── app.js        # inline validation, counters, spinners
 │       ├── favicon.ico
 │       ├── favicon-16x16.png
 │       ├── favicon-32x32.png
@@ -507,27 +478,29 @@ contactUform/
 ├── src/
 │   ├── Database.php          # PDO connection factory
 │   ├── Validator.php         # all input rules + SA phone normalization
-│   └── EntryRepository.php   # SQL for the entries table
+│   ├── RateLimiter.php       # sliding-window rate limiter
+│   └── EntryRepository.php   # SQL for the entries table (incl. search/sort/export)
 │
 ├── templates/
-│   ├── header.php
+│   ├── header.php            # shared shell, skip link, nav
 │   ├── footer.php
 │   ├── flash.php             # success/error banner
 │   └── components/
-│       ├── form-field.php    # label + input + hint + error
-│       ├── alert.php         # success/error/warning/info
-│       ├── button.php        # primary/secondary with optional spinner
-│       └── empty-state.php   # icon + message + optional CTA
+│       ├── form-field.php    # label + input + hint + error (aria wired)
+│       ├── alert.php
+│       ├── button.php
+│       └── empty-state.php
 │
 └── tests/
     ├── run.php               # unit test runner
-    ├── TestCase.php          # assertion helpers
+    ├── TestCase.php
     ├── bootstrap.php
     ├── ValidatorTest.php
     ├── EntryRepositoryTest.php
+    ├── RateLimiterTest.php
     └── http/
         ├── run.php           # HTTP test runner
-        ├── HttpTestCase.php  # server lifecycle + HTTP client
+        ├── HttpTestCase.php
         └── SubmitHttpTest.php
 ```
 
@@ -544,33 +517,6 @@ docker compose exec web php tests/run.php
 # or: make test
 ```
 
-Or, without Docker:
-
-```bash
-php tests/run.php
-```
-
-Output looks like:
-
-```
-Contact Form — Test Suite
-============================================================
-
-EntryRepositoryTest
-  [OK]  all clamps out of range arguments (2 assertions)
-  [OK]  all respects limit and offset (3 assertions)
-  ...
-
-ValidatorTest
-  [OK]  sa phone number normalization (8 assertions)
-  [OK]  sa phone rejects junk (9 assertions)
-  ...
-
-────────────────────────────────────────────────────────────
-18 tests, 74 assertions in 0.183s
-All passed
-```
-
 Exit code is `0` on success, `1` on any failure — so it works in CI.
 
 ### HTTP tests
@@ -578,25 +524,6 @@ Exit code is `0` on success, `1` on any failure — so it works in CI.
 ```bash
 docker compose exec web php tests/http/run.php
 # or: make test-http
-```
-
-Output looks like:
-
-```
-HTTP Test Suite
-============================================================
-
-SubmitHttpTest
-  [OK]  csrf token cannot be reused after success (6 assertions)
-  [OK]  get request redirects without inserting (3 assertions)
-  [OK]  missing csrf token rejects submission (4 assertions)
-  [OK]  tampered csrf token rejects submission (3 assertions)
-  [OK]  valid submission inserts row and redirects (6 assertions)
-  [OK]  validation failure redirects without inserting (3 assertions)
-
-────────────────────────────────────────────────────────────
-6 tests, 25 assertions in 1.8s
-All passed
 ```
 
 These tests spawn PHP's built-in server on a random port, then make real
@@ -615,16 +542,15 @@ docker compose exec -T db mysql -uappuser -papppassword contact_form < db/init.s
 ### What the tests cover
 
 - **`ValidatorTest`** — every field rule, every accepted SA phone format, every rejected input shape
-- **`EntryRepositoryTest`** — create/find/list/count against the live MySQL, wrapped in transactions that roll back so the DB stays clean
+- **`EntryRepositoryTest`** — create/find/list/count against the live MySQL
+- **`RateLimiterTest`** — sliding window limits, pruning, per-IP isolation
 - **`SubmitHttpTest`** — `submit.php` end-to-end: successful insert, GET rejection, CSRF validation, DB rollback on error
 
 ### What they don't cover (yet)
 
 - Rendered HTML from the templates (no DOM assertions)
 - Browser behaviour of `app.js` (no JS tests)
-- Full accessibility audit
-
-These are listed under "Things I'd improve" below.
+- Visual regression
 
 ---
 
@@ -643,33 +569,32 @@ be added for dev-only tooling (PHPUnit, PHPStan) without touching runtime.
 
 **Why is `src/` outside `public/`?**
 Only `public/` is the web root, so business logic, config, and `.env` are
-physically unreachable over HTTP. On shared hosting where everything sits
-in `public_html/`, the root `.htaccess` blocks the sensitive extensions
-instead.
+physically unreachable over HTTP.
 
 **Why store phone numbers in E.164?**
 `+27821234567` is unambiguous and country-code agnostic. Formatting for
-display happens in the template (`082 123 4567`). If the app ever needs to
-send SMS or integrate with a dialler, the data is already in the right shape.
+display happens in the template (`082 123 4567`).
 
 **Why `VARBINARY(16)` for IP addresses?**
-Fits both IPv4 (4 bytes) and IPv6 (16 bytes) efficiently, and it's the
-"correct" MySQL type for this. Stored via `inet_pton()`, read via `inet_ntop()`.
-
-**Why so few comments?**
-Comments explain *why*, not *what*. The code says what it does; comments
-say why a decision was made (e.g. why `LIMIT` needs `PDO::PARAM_INT`).
+Fits both IPv4 (4 bytes) and IPv6 (16 bytes) efficiently. Stored via
+`inet_pton()`, read via `inet_ntop()`.
 
 **Why a hand-rolled test runner instead of PHPUnit?**
 The project is deliberately Composer-free. Each runner is ~100 lines,
-prints a familiar format, and exits with the correct code. Swapping in
-PHPUnit later is a 20-minute job if needed.
+prints a familiar format, and exits with the correct code.
 
 **Why two test suites instead of one?**
 Unit tests run in 0.1s and catch logic errors. HTTP tests run in 2s and
 catch glue errors (routing, CSRF, redirects). Merging them means every
 `php tests/run.php` invocation pays the HTTP cost — so they stay separate.
-CI runs both in parallel jobs.
+
+**Why per-IP rate limiting instead of CAPTCHA?**
+Simple, no third-party dependency, no user friction. Only counts successful
+submissions, so typos don't burn the quota.
+
+**Why extensionless URLs?**
+Cleaner and matches how modern apps look. Handled by a single rewrite rule
+in `public/.htaccess` — no routing framework needed.
 
 ---
 
@@ -677,50 +602,35 @@ CI runs both in parallel jobs.
 
 Honest list, in priority order:
 
-### 1. Rate limiting
-No protection against someone spamming the form. A simple approach: track
-submissions per IP in a `rate_limit` table, reject when a threshold is
-exceeded within a window.
-
-### 2. Admin authentication
+### 1. Admin authentication
 The entries page is currently public. In production, at minimum:
 - Basic auth via `.htpasswd`, or
 - Session-based login with a bcrypt-hashed password in env
 
-### 3. Search / filter on entries
-Filter by name or email. Requires adding a `WHERE` clause with a bound
-search term.
-
-### 4. Honeypot or CAPTCHA on the form
+### 2. Honeypot or CAPTCHA on the form
 A hidden field that bots fill in but humans don't is a cheap win. Full
-CAPTCHA (hCaptcha, Turnstile) is heavier but more effective.
+CAPTCHA (hCaptcha, Turnstile) is heavier but more effective. Complements
+the rate limiter, doesn't replace it.
 
-### 5. Accessibility audit
-The form uses proper labels, `aria-invalid`, and `role="alert"` on the
-flash message. What's missing:
-- End-to-end keyboard-only walkthrough
-- Screen reader test (NVDA / VoiceOver)
-- Colour contrast check on the muted-text palette
-
-### 6. Static analysis
+### 3. Static analysis
 PHPStan at level 6+ would catch type issues the tests miss. Would need
 Composer as a dev dependency only.
 
-### 7. Structured logging
+### 4. Structured logging
 Currently logs go to stderr. In production I'd want JSON logs with request
 IDs, so failures can be traced across services.
 
-### 8. Email notification
+### 5. Email notification
 When a new entry is saved, send an email to the site owner. Would use a
 transactional provider (Postmark, SES) rather than `mail()`.
 
-### 9. Export
-CSV or JSON export of entries for the site owner. A single
-`GET /entries.php?format=csv` endpoint.
-
-### 10. Cross-browser testing
+### 6. Cross-browser testing
 Only tested in Chrome + Firefox during development. Would want Safari and
 mobile Safari before considering the UI done.
+
+### 7. CI accessibility scan
+Add axe-core or Lighthouse to the CI pipeline to catch regressions in ARIA
+and contrast. The manual audit is done, but automated scans catch new issues.
 
 ---
 
@@ -728,13 +638,24 @@ mobile Safari before considering the UI done.
 
 - **SQL injection** — every query uses prepared statements, no string interpolation
 - **XSS** — all output goes through `e()` (`htmlspecialchars` with `ENT_QUOTES`)
-- **CSRF** — form includes a session-backed token; `submit.php` verifies with `hash_equals()` and rotates the token after success
+- **CSRF** — form includes a session-backed token; `submit.php` verifies with `hash_equals()` and rotates after success
 - **Session fixation** — session ID rotates on successful submission
 - **Cookie flags** — `HttpOnly`, `SameSite=Lax`, `Secure` when HTTPS is detected
-- **Password handling** — n/a; the app has no user accounts
+- **Rate limiting** — 5 submissions per IP per 15 minutes (sliding window, MySQL-backed)
 - **File uploads** — the app rejects any request containing `$_FILES`
 - **Sensitive files** — `.env`, `.sql`, config files blocked via `.htaccess` and by living outside `public/`
 - **Error leakage** — DB errors log server-side but never appear in the browser
+- **ORDER BY injection** — sort keys are whitelisted (never interpolated from user input)
+
+---
+
+## Screenshots
+
+| Contact form | Entries list |
+|---|---|
+| ![Contact form](docs/screenshots/contact.jpeg) | ![Entries list](docs/screenshots/entries.jpeg) |
+
+---
 
 ## Author
 
