@@ -37,7 +37,7 @@ final class SubmitHttpTest extends HttpTestCase
             'Expected 303 redirect, got ' . $response['status'] .
             ' — body: ' . substr($response['body'], 0, 300)
         );
-        $this->assertSame('/index.php', $response['location']);
+        $this->assertSame('/', $response['location']);
         $this->assertSame($before + 1, $this->countEntries());
 
         $row = $this->findEntryByEmail(self::TEST_EMAIL);
@@ -57,7 +57,7 @@ final class SubmitHttpTest extends HttpTestCase
         $response = $this->get('/submit.php');
 
         $this->assertSame(303, $response['status']);
-        $this->assertSame('/index.php', $response['location']);
+        $this->assertSame('/', $response['location']);
         $this->assertSame($before, $this->countEntries(), 'GET must not insert a row');
     }
 
@@ -77,7 +77,7 @@ final class SubmitHttpTest extends HttpTestCase
         ]);
 
         $this->assertSame(303, $response['status']);
-        $this->assertSame('/index.php', $response['location']);
+        $this->assertSame('/', $response['location']);
         $this->assertSame($before, $this->countEntries());
         $this->assertNull($this->findEntryByEmail(self::TEST_EMAIL));
     }
@@ -160,7 +160,7 @@ final class SubmitHttpTest extends HttpTestCase
     // Cleanup
     // --------------------------------------------------------
 
-    protected function tearDown(): void
+    public function tearDown(): void
     {
         $this->deleteByEmail(self::TEST_EMAIL);
     }

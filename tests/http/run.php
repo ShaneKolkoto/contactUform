@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/../../bootstrap.php';
-require __DIR__ . '/../TestCase.php';
-require __DIR__ . '/../HttpTestCase.php';
+require_once __DIR__ . '/../../bootstrap.php';
+require_once __DIR__ . '/../TestCase.php';
+require_once __DIR__ . '/HttpTestCase.php';
 
 use Tests\HttpTestCase;
 use Tests\TestFailure;
@@ -16,11 +16,11 @@ $dim = $useColour ? "\033[2m" : '';
 $bold = $useColour ? "\033[1m" : '';
 $reset = $useColour ? "\033[0m" : '';
 
-$testFiles = glob(__DIR__ . '/../*HttpTest.php') ?: [];
+$testFiles = glob(__DIR__ . '/*HttpTest.php') ?: [];
 sort($testFiles);
 
 if ($testFiles === []) {
-    echo "No HTTP test files found in " . realpath(__DIR__ . '/..') . "\n";
+    echo "No HTTP test files found in " . __DIR__ . "\n";
     exit(1);
 }
 

@@ -15,9 +15,12 @@ abstract class HttpTestCase extends TestCase
 
     protected PDO $pdo;
 
-    /** @var array<string,string> Cookie jar for the current request chain */
+    /** @var array<string,string> */
     private array $cookies = [];
 
+    // --------------------------------------------------------
+    // Server lifecycle
+    // --------------------------------------------------------
 
     public static function bootServer(): void
     {
@@ -28,7 +31,7 @@ abstract class HttpTestCase extends TestCase
         self::$port = random_int(20000, 40000);
         self::$baseUrl = 'http://127.0.0.1:' . self::$port;
 
-        $docRoot = dirname(__DIR__) . '/public';
+        $docRoot = dirname(__DIR__, 2) . '/public';
         $cmd = sprintf(
             'php -S 127.0.0.1:%d -t %s',
             self::$port,
@@ -43,14 +46,13 @@ abstract class HttpTestCase extends TestCase
                 2 => ['pipe', 'w'],
             ],
             $pipes,
-            dirname(__DIR__)
+            dirname(__DIR__, 2)
         );
 
         if (!is_resource(self::$serverProcess)) {
             throw new RuntimeException('Failed to start PHP built-in server');
         }
 
-        // Wait for the server to accept connections (up to 5 seconds)
         $deadline = microtime(true) + 5;
         while (microtime(true) < $deadline) {
             $fp = @fsockopen('127.0.0.1', self::$port, $errno, $errstr, 0.1);
@@ -102,14 +104,11 @@ abstract class HttpTestCase extends TestCase
     }
 
     // --------------------------------------------------------
-    // HTTP client helpers
+    // HTTP client
     // --------------------------------------------------------
 
     /**
-     * Performs an HTTP request. Returns the raw response with status,
-     * headers, and body.
-     *
-     * @return array{status:int, headers:array<string,string>, body:string, location:?string}
+     * @return array{status:int, headers:array<string,array<int,string>>, body:string, location:?string}
      */
     protected function request(string $method, string $path, array $body = []): array
     {
@@ -143,17 +142,21 @@ abstract class HttpTestCase extends TestCase
         $rawHeaders = substr($raw, 0, $headerSize);
         $rawBody = substr($raw, $headerSize);
 
+        // Handle redirect chains (each response has its own headers)
         $headers = $this->parseHeaders($rawHeaders);
 
+        // Store any Set-Cookie headers — parseHeaders returns arrays for multi-value
         if (isset($headers['set-cookie'])) {
-            $this->storeCookies($headers['set-cookie']);
-        }
+    foreach ($headers['set-cookie'] as $setCookie) {
+        $this->storeCookie($setCookie);
+    }
+}
 
         return [
             'status' => $status,
             'headers' => $headers,
             'body' => $rawBody,
-            'location' => $headers['location'] ?? null,
+            'location' => isset($headers['location'][0]) ? $headers['location'][0] : null,
         ];
     }
 
@@ -167,18 +170,13 @@ abstract class HttpTestCase extends TestCase
         return $this->request('POST', $path, $body);
     }
 
-    /**
-     * Fetches a CSRF token by GETting the form and extracting the
-     * hidden input value. Uses the current cookie jar, so the resulting
-     * token will match the session the server sees.
-     */
     protected function fetchCsrfToken(): string
     {
         $response = $this->get('/');
-        $this->assertSame(200, $response['status'], 'Form page should return 200');
+        $this->assertSame(200, $response['status'], 'Form page should return 200 — body: ' . substr($response['body'], 0, 300));
 
         if (!preg_match('/name="csrf"\s+value="([a-f0-9]+)"/', $response['body'], $m)) {
-            throw new RuntimeException('Could not find CSRF token in form HTML');
+            throw new RuntimeException('Could not find CSRF token in form HTML — body: ' . substr($response['body'], 0, 500));
         }
 
         return $m[1];
@@ -207,31 +205,47 @@ abstract class HttpTestCase extends TestCase
         return ['Cookie: ' . implode('; ', $pairs)];
     }
 
-    private function storeCookies(string $rawSetCookie): void
-    {
-        $parts = preg_split('/,(?=[^;]*=)/', $rawSetCookie);
-        if ($parts === false) {
-            return;
-        }
-        foreach ($parts as $part) {
-            if (preg_match('/^([^=]+)=([^;]*)/', trim($part), $m)) {
-                $this->cookies[trim($m[1])] = $m[2];
-            }
-        }
+    /**
+     * Parses a single Set-Cookie header and stores the cookie.
+     * Handles the standard "name=value; Path=/; HttpOnly; ..." format.
+     */
+    private function storeCookie(string $setCookie): void
+{
+    $first = explode(';', $setCookie, 2)[0];
+    $first = trim($first);
+
+    if (!str_contains($first, '=')) {
+        return;
     }
 
-    /** @return array<string,string> */
-    private function parseHeaders(string $raw): array
-    {
-        $headers = [];
-        foreach (explode("\r\n", $raw) as $line) {
-            if (str_contains($line, ':')) {
-                [$name, $value] = explode(':', $line, 2);
-                $headers[strtolower(trim($name))] = trim($value);
-            }
+    [$name, $value] = explode('=', $first, 2);
+    $this->cookies[trim($name)] = trim($value);
+}
+
+    /**
+     * Parses raw HTTP headers into an array. Headers that appear multiple
+     * times (Set-Cookie, Location on redirect chains) are collected into arrays.
+     *
+     * @return array<string, array<int,string>>
+     */
+   private function parseHeaders(string $raw): array
+{
+    $headers = [];
+    foreach (explode("\r\n", $raw) as $line) {
+        if (!str_contains($line, ':')) {
+            continue;
         }
-        return $headers;
+        [$name, $value] = explode(':', $line, 2);
+        $name = strtolower(trim($name));
+        $value = trim($value);
+        if ($name === '' || $value === '') {
+            continue;
+        }
+        $headers[$name] ??= [];
+        $headers[$name][] = $value;
     }
+    return $headers;
+}
 
     // --------------------------------------------------------
     // DB helpers
