@@ -43,14 +43,10 @@ try {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// Turns a timestamp into a friendly relative label.
+// "just now", "5 minutes ago", "yesterday", then a date
+// beyond a week.
 // ------------------------------------------------------------
-
-/**
- * Turns a timestamp into a friendly relative label.
- * "just now", "5 minutes ago", "2 hours ago", "yesterday",
- * then falls back to "15 Oct 2026, 14:22" beyond a week.
- */
 function format_relative_time(string $timestamp): string
 {
     $ts = strtotime($timestamp);
@@ -101,22 +97,19 @@ require __DIR__ . '/../templates/header.php';
     </div>
 
     <?php if ($dbError !== null): ?>
-        <div class="alert alert-danger" role="alert">
-            <span class="alert__label">Error</span>
-            <span><?= e($dbError) ?></span>
-        </div>
+        <?php render_alert([
+            'type' => 'error',
+            'message' => $dbError,
+        ]); ?>
 
     <?php elseif ($entries === []): ?>
-        <div class="card">
-            <div class="empty-state">
-                <div class="empty-state__icon" aria-hidden="true">📭</div>
-                <h2 class="h5 mb-2">No entries yet</h2>
-                <p class="text-muted mb-4">
-                    Once someone submits the contact form, their message will show up here.
-                </p>
-                <a href="index.php" class="btn btn-primary">Go to the form</a>
-            </div>
-        </div>
+        <?php render_empty_state([
+            'icon' => '📭',
+            'title' => 'No entries yet',
+            'message' => 'Once someone submits the contact form, their message will show up here.',
+            'actionUrl' => '/',
+            'actionLabel' => 'Go to the form',
+        ]); ?>
 
     <?php else: ?>
         <div class="card">

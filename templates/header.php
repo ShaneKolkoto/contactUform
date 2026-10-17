@@ -29,7 +29,7 @@ $flash = flash_get();
 <header class="site-header">
     <div class="container">
         <div class="d-flex align-items-center justify-content-between" style="height: 60px;">
-            <a class="brand" href="index.php">
+            <a class="brand" href="/">
                 <span class="brand__mark" aria-hidden="true"></span>
                 <span><?= e($config['app']['name']) ?></span>
             </a>

@@ -12,7 +12,7 @@ use App\Validator;
 // Only POST is allowed
 // ------------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    redirect('index.php');
+    redirect('/');
 }
 
 // ------------------------------------------------------------
@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // ------------------------------------------------------------
 if (!csrf_verify($_POST['csrf'] ?? null)) {
     flash('error', 'Your session expired. Please try again.');
-    redirect('index.php');
+    redirect('/');
 }
 
 // ------------------------------------------------------------
@@ -36,7 +36,7 @@ if (!$validator->validate($_POST)) {
         'phone'   => $_POST['phone']   ?? '',
         'message' => $_POST['message'] ?? '',
     ];
-    redirect('index.php');
+    redirect('/');
 }
 
 $clean = $validator->clean();
@@ -60,7 +60,7 @@ try {
     unset($_SESSION['csrf']);
 
     flash('success', 'Thank you — your message has been received. We will be in touch soon.');
-    redirect('index.php');
+    redirect('/');
 
 } catch (Throwable $e) {
     error_log('[submit] ' . $e->getMessage());
@@ -72,5 +72,5 @@ try {
         'phone'   => $_POST['phone']   ?? '',
         'message' => $_POST['message'] ?? '',
     ];
-    redirect('index.php');
+    redirect('/');
 }

@@ -133,7 +133,7 @@ require __DIR__ . '/../templates/header.php';
         'icon' => '📭',
         'title' => 'No entries yet',
         'message' => 'Once someone submits the form, their message appears here.',
-        'actionUrl' => 'index.php',
+        'actionUrl' => '/',
         'actionLabel' => 'Go to the form',
     ]); ?>
 
