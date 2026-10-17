@@ -79,7 +79,7 @@ final class EntryRepositoryTest extends TestCase
     public function test_all_respects_limit_and_offset(): void
     {
         $three = $this->repo->all(limit: 3);
-        $this->assertCount(3, $three);
+        $this->assertCount(3, $three); // ← fails if fewer than 3 rows exist
 
         $firstTwo = $this->repo->all(limit: 2, offset: 0);
         $nextTwo  = $this->repo->all(limit: 2, offset: 2);
