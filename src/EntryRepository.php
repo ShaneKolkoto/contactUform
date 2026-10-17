@@ -6,28 +6,12 @@ namespace App;
 
 use PDO;
 
-/**
- * Every SQL query that touches the entries table lives here.
- * Nothing outside this class writes SQL for entries.
- *
- * Typical use:
- *
- *     $repo = new EntryRepository(Database::connect($config['database']));
- *     $id   = $repo->create([...]);
- *     $rows = $repo->all();
- */
 final class EntryRepository
 {
     public function __construct(private PDO $pdo)
     {
     }
 
-    /**
-     * Inserts a new entry and returns its id.
-     *
-     * Expects already-validated data — name, email, phone (E.164),
-     * message, and an optional binary-packed IP.
-     */
     public function create(array $data): int
     {
         $statement = $this->pdo->prepare(
@@ -35,25 +19,24 @@ final class EntryRepository
              VALUES (:name, :email, :phone, :message, :ip)'
         );
 
-        $statement->execute([
-            ':name'    => $data['name'],
-            ':email'   => $data['email'],
-            ':phone'   => $data['phone'],
-            ':message' => $data['message'],
-            ':ip'      => $data['ip'] ?? null,
-        ]);
+        $statement->bindValue(':name', $data['name'], PDO::PARAM_STR);
+        $statement->bindValue(':email', $data['email'], PDO::PARAM_STR);
+        $statement->bindValue(':phone', $data['phone'], PDO::PARAM_STR);
+        $statement->bindValue(':message', $data['message'], PDO::PARAM_STR);
+
+        if (isset($data['ip']) && is_string($data['ip']) && $data['ip'] !== '') {
+            $statement->bindValue(':ip', $data['ip'], PDO::PARAM_LOB);
+        } else {
+            $statement->bindValue(':ip', null, PDO::PARAM_NULL);
+        }
+
+        $statement->execute();
 
         return (int) $this->pdo->lastInsertId();
     }
 
-    /**
-     * Returns entries newest-first, with optional pagination.
-     *
-     * @return array<int, array<string, mixed>>
-     */
     public function all(int $limit = 50, int $offset = 0): array
     {
-        // Clamp so a bad query string can't ask for the whole table
         $limit = max(1, min(500, $limit));
         $offset = max(0, $offset);
 
@@ -64,8 +47,6 @@ final class EntryRepository
              LIMIT :limit OFFSET :offset'
         );
 
-        // MySQL rejects LIMIT/OFFSET placeholders bound as strings
-        // when emulated prepares are off, so bind them as ints
         $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
         $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
         $statement->execute();
@@ -74,18 +55,93 @@ final class EntryRepository
     }
 
     /**
-     * Total number of entries. Used for pagination and empty-state checks.
+     * Returns entries matching an optional search term and time range,
+     * newest first, with pagination.
+     *
+     * @param string|null $search  Matches name, email, or message (LIKE)
+     * @param int         $days    Restrict to the last N days (0 = no filter)
+     * @return array<int, array<string, mixed>>
      */
+    public function search(?string $search, int $days, int $limit, int $offset): array
+    {
+        [$where, $params] = $this->buildWhereClause($search, $days);
+
+        $limit = max(1, min(500, $limit));
+        $offset = max(0, $offset);
+
+        $sql = 'SELECT id, name, email, phone, message, created_at
+                FROM entries' . $where . '
+                ORDER BY created_at DESC
+                LIMIT :limit OFFSET :offset';
+
+        $statement = $this->pdo->prepare($sql);
+
+        foreach ($params as $name => $value) {
+            $statement->bindValue($name, $value, PDO::PARAM_STR);
+        }
+
+        $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $statement->execute();
+
+        return $statement->fetchAll();
+    }
+
+    /**
+     * Counts entries matching the same filter conditions as search().
+     */
+    public function searchCount(?string $search, int $days): int
+    {
+        [$where, $params] = $this->buildWhereClause($search, $days);
+
+        $statement = $this->pdo->prepare('SELECT COUNT(*) FROM entries' . $where);
+
+        foreach ($params as $name => $value) {
+            $statement->bindValue($name, $value, PDO::PARAM_STR);
+        }
+
+        $statement->execute();
+
+        return (int) $statement->fetchColumn();
+    }
+
+    /**
+     * Builds a WHERE clause from search and day-range filters.
+     *
+     * Uses three distinct parameter names (:search_name, :search_email,
+     * :search_message) instead of reusing :search. With
+     * PDO::ATTR_EMULATE_PREPARES => false, MySQL 8 rejects the same named
+     * parameter appearing multiple times in one statement (HY093).
+     *
+     * @return array{0:string, 1:array<string,string>}
+     */
+    private function buildWhereClause(?string $search, int $days): array
+    {
+        $conditions = [];
+        $params = [];
+
+        if ($search !== null && trim($search) !== '') {
+            $conditions[] = '(name LIKE :search_name OR email LIKE :search_email OR message LIKE :search_message)';
+            $like = '%' . trim($search) . '%';
+            $params[':search_name']    = $like;
+            $params[':search_email']   = $like;
+            $params[':search_message'] = $like;
+        }
+
+        if ($days > 0) {
+            $conditions[] = 'created_at >= NOW() - INTERVAL ' . (int) $days . ' DAY';
+        }
+
+        $where = $conditions === [] ? '' : ' WHERE ' . implode(' AND ', $conditions);
+
+        return [$where, $params];
+    }
+
     public function count(): int
     {
         return (int) $this->pdo->query('SELECT COUNT(*) FROM entries')->fetchColumn();
     }
 
-    /**
-     * Finds a single entry by id, or null if it doesn't exist.
-     *
-     * @return array<string, mixed>|null
-     */
     public function find(int $id): ?array
     {
         $statement = $this->pdo->prepare(
