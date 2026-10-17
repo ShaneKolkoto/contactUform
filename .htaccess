@@ -16,6 +16,9 @@
     RewriteRule "(^|/)\.(?!well-known/)" - [F]
 </IfModule>
 
+
+ErrorDocument 404 /404.php
+
 # ------------------------------------------------------------
 # Extensionless URLs
 #
