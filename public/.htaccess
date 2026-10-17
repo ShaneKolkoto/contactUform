@@ -21,3 +21,5 @@
 <FilesMatch "(?i)\.(env.*|sql|sqlite|db|md|json|lock|ini|log|bak|backup|old|orig|swp|swo|tmp|dist|map|ya?ml)$">
     Require all denied
 </FilesMatch>
+
+ErrorDocument 404 /404.php
