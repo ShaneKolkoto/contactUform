@@ -13,7 +13,7 @@ $active = 'entries';
 $pageStyles = ['assets/css/entries.css'];
 
 // ------------------------------------------------------------
-// Read filters from the query string
+// Read filters, limit, and sort
 // ------------------------------------------------------------
 $search = trim((string) ($_GET['q'] ?? ''));
 $range  = (string) ($_GET['range'] ?? 'all');
@@ -27,8 +27,24 @@ $rangeOptions = [
 $days = $rangeOptions[$range] ?? 0;
 $range = array_key_exists($range, $rangeOptions) ? $range : 'all';
 
+$limitOptions = [10, 25, 50, 100];
+$perPage = (int) ($_GET['per_page'] ?? 10);
+if (!in_array($perPage, $limitOptions, true)) {
+    $perPage = 10;
+}
+
+$sortOptions = [
+    'newest'    => 'Newest first',
+    'oldest'    => 'Oldest first',
+    'name_asc'  => 'Name A–Z',
+    'name_desc' => 'Name Z–A',
+];
+$sort = (string) ($_GET['sort'] ?? 'newest');
+if (!array_key_exists($sort, $sortOptions)) {
+    $sort = 'newest';
+}
+
 $page = max(1, (int) ($_GET['page'] ?? 1));
-$perPage = 10;
 $offset = ($page - 1) * $perPage;
 
 $entries = [];
@@ -51,6 +67,7 @@ try {
     $entries = $repo->search(
         $search !== '' ? $search : null,
         $days,
+        $sort,
         $perPage,
         $offset
     );
@@ -59,7 +76,7 @@ try {
     $dbError = 'Could not load entries. Please try again in a moment.';
 }
 
-$hasActiveFilter = $search !== '' || $days > 0;
+$hasActiveFilter = $search !== '' || $days > 0 || $perPage !== 10 || $sort !== 'newest';
 
 // ------------------------------------------------------------
 // Helpers
@@ -105,15 +122,20 @@ function build_query(array $overrides = []): string
     $params = array_merge([
         'q' => $_GET['q'] ?? '',
         'range' => $_GET['range'] ?? 'all',
+        'per_page' => $_GET['per_page'] ?? 10,
+        'sort' => $_GET['sort'] ?? 'newest',
         'page' => $_GET['page'] ?? 1,
     ], $overrides);
 
+    // Drop default values to keep URLs clean
     if ($params['q'] === '') unset($params['q']);
     if (($params['range'] ?? 'all') === 'all') unset($params['range']);
+    if (($params['per_page'] ?? 10) == 10) unset($params['per_page']);
+    if (($params['sort'] ?? 'newest') === 'newest') unset($params['sort']);
     if (($params['page'] ?? 1) == 1) unset($params['page']);
 
     $qs = http_build_query($params);
-    return $qs === '' ? '?' : '?' . $qs;
+    return '/entries' . ($qs === '' ? '' : '?' . $qs);
 }
 
 require __DIR__ . '/../templates/header.php';
@@ -159,7 +181,7 @@ require __DIR__ . '/../templates/header.php';
             </div>
         </div>
 
-        <form method="get" action="/entries" class="entries-filters" role="search">
+        <form method="get" action="/entries" class="entries-filters" id="filter-form" role="search">
             <div class="entries-filters__search">
                 <label for="q" class="visually-hidden">Search entries</label>
                 <input
@@ -173,7 +195,7 @@ require __DIR__ . '/../templates/header.php';
             </div>
 
             <div class="entries-filters__range">
-                <label for="range" class="visually-hidden">Filter by date</label>
+                <label for="range" class="visually">Filter by date</label>
                 <select id="range" name="range" class="form-select">
                     <option value="all"   <?= $range === 'all'   ? 'selected' : '' ?>>All time</option>
                     <option value="today" <?= $range === 'today' ? 'selected' : '' ?>>Today</option>
@@ -182,19 +204,62 @@ require __DIR__ . '/../templates/header.php';
                 </select>
             </div>
 
-            <button type="submit" class="btn btn-primary">Filter</button>
+            <div class="entries-filters__sort">
+                <label for="sort" class="visually">Sort by</label>
+                <select id="sort" name="sort" class="form-select">
+                    <?php foreach ($sortOptions as $value => $label): ?>
+                        <option value="<?= e($value) ?>" <?= $sort === $value ? 'selected' : '' ?>>
+                            <?= e($label) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="entries-filters__limit">
+                <label for="per_page" class="visually">Entries per page</label>
+                <select id="per_page" name="per_page" class="form-select">
+                    <?php foreach ($limitOptions as $opt): ?>
+                        <option value="<?= $opt ?>" <?= $perPage === $opt ? 'selected' : '' ?>>
+                            Show <?= $opt ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="filter-btn">
+                <span class="btn__spinner d-none" aria-hidden="true"></span>
+                <span class="btn__label">Filter</span>
+            </button>
 
             <?php if ($hasActiveFilter): ?>
                 <a href="/entries" class="btn btn-secondary">Clear</a>
             <?php endif; ?>
         </form>
 
+        <?php if ($hasActiveFilter): ?>
+            <div class="alert alert-info d-flex align-items-center gap-2 mb-4" role="status">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <span>
+                    Showing results
+                    <?php if ($search !== ''): ?>
+                        for <strong>"<?= e($search) ?>"</strong>
+                    <?php endif; ?>
+                    <?php if ($days > 0): ?>
+                        from the <?= $range === 'today' ? 'last 24 hours' : "last {$days} days" ?>
+                    <?php endif; ?>
+                    <?php if ($sort !== 'newest'): ?>
+                        &middot; sorted by <strong><?= e(strtolower($sortOptions[$sort])) ?></strong>
+                    <?php endif; ?>
+                </span>
+            </div>
+        <?php endif; ?>
+
         <?php if ($hasActiveFilter && $entries === []): ?>
             <?php render_empty_state([
                 'icon' => '🔍',
                 'title' => 'No matching entries',
                 'message' => 'Try a different search term or widen the date range.',
-                'actionUrl' => 'entries.php',
+                'actionUrl' => '/entries',
                 'actionLabel' => 'Clear filters',
             ]); ?>
 
@@ -208,6 +273,25 @@ require __DIR__ . '/../templates/header.php';
             ]); ?>
 
         <?php else: ?>
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div></div>
+                <?php
+                    $exportParams = [];
+                    if ($search !== '') $exportParams['q'] = $search;
+                    if ($range !== 'all') $exportParams['range'] = $range;
+                    if ($sort !== 'newest') $exportParams['sort'] = $sort;
+                    $exportQuery = $exportParams ? '?' . http_build_query($exportParams) : '';
+                ?>
+                <a href="/export<?= e($exportQuery) ?>" class="btn btn-secondary btn-sm">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.35em; vertical-align: -2px;">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Export CSV
+                </a>
+            </div>
 
             <div class="entries-list">
                 <?php foreach ($entries as $entry): ?>

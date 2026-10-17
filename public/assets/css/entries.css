@@ -303,3 +303,71 @@
         line-height: 1.55;
     }
 }
+
+/* ============================================================
+   Active Filter Banner
+   ============================================================ */
+
+.alert-info {
+    background-color: #eff8ff;
+    border-color: #b2ddff;
+    color: #175cd3;
+    font-size: 0.875rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--bs-border-radius);
+}
+
+.alert-info strong {
+    font-weight: 600;
+}
+
+.alert-info svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+/* ============================================================
+   Limit Dropdown
+   ============================================================ */
+
+.entries-filters__limit {
+    flex: 0 0 auto;
+    min-width: 120px;
+}
+
+.entries-filters__limit .form-select {
+    background-color: #f9fafb;
+    border-color: transparent;
+    padding: 0.625rem 2rem 0.625rem 1rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: #344054;
+    cursor: pointer;
+}
+
+.entries-filters__limit .form-select:focus {
+    background-color: #fff;
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.15);
+}
+
+@media (max-width: 767px) {
+    .entries-filters__limit {
+        width: 100%;
+    }
+}
+
+/* ============================================================
+   Entries toolbar (export button row)
+   ============================================================ */
+
+.entries-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.entries-toolbar .btn {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.875rem;
+}
