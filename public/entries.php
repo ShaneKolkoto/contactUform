@@ -10,6 +10,7 @@ use App\Validator;
 
 $pageTitle = 'Saved entries';
 $active = 'entries';
+$pageStyles = ['assets/css/entries.css'];
 
 // ------------------------------------------------------------
 // Load entries with simple pagination
@@ -30,7 +31,6 @@ try {
     $total = $repo->count();
     $totalPages = max(1, (int) ceil($total / $perPage));
 
-    // Clamp page to the last valid page if someone requests too far
     if ($page > $totalPages) {
         $page = $totalPages;
         $offset = ($page - 1) * $perPage;
@@ -43,10 +43,12 @@ try {
 }
 
 // ------------------------------------------------------------
-// Turns a timestamp into a friendly relative label.
-// "just now", "5 minutes ago", "yesterday", then a date
-// beyond a week.
+// Helpers
 // ------------------------------------------------------------
+
+/**
+ * Turns a timestamp into a friendly relative label.
+ */
 function format_relative_time(string $timestamp): string
 {
     $ts = strtotime($timestamp);
@@ -78,23 +80,25 @@ function format_relative_time(string $timestamp): string
     return date('j M Y, H:i', $ts);
 }
 
+/**
+ * Renders an avatar with the sender's initials.
+ */
+function entry_initials(string $name): string
+{
+    $parts = preg_split('/\s+/', trim($name));
+    if ($parts === false || $parts === []) {
+        return '?';
+    }
+
+    $first = mb_substr($parts[0], 0, 1);
+    $last = count($parts) > 1 ? mb_substr(end($parts), 0, 1) : '';
+    return mb_strtoupper($first . $last);
+}
+
 require __DIR__ . '/../templates/header.php';
 ?>
 
-<div class="container--wide">
-    <div class="page-header">
-        <h1 class="mb-2">Saved entries</h1>
-        <p class="page-header__subtitle">
-            <?php if ($total > 0): ?>
-                <?= $total ?> submission<?= $total === 1 ? '' : 's' ?> so far
-                <?php if ($totalPages > 1): ?>
-                    &middot; page <?= $page ?> of <?= $totalPages ?>
-                <?php endif; ?>
-            <?php else: ?>
-                Messages submitted through the contact form appear here.
-            <?php endif; ?>
-        </p>
-    </div>
+<div class="container--wide mt-4">
 
     <?php if ($dbError !== null): ?>
         <?php render_alert([
@@ -112,48 +116,52 @@ require __DIR__ . '/../templates/header.php';
         ]); ?>
 
     <?php else: ?>
-        <div class="card">
-            <div class="table-responsive">
-                <table class="table align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th scope="col">Name</th>
-                            <th scope="col">Contact</th>
-                            <th scope="col">Message</th>
-                            <th scope="col">Received</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($entries as $entry): ?>
-                            <tr>
-                                <td>
-                                    <div class="fw-semibold"><?= e($entry['name']) ?></div>
-                                </td>
-                                <td>
-                                    <div>
-                                        <a href="mailto:<?= e($entry['email']) ?>">
-                                            <?= e($entry['email']) ?>
-                                        </a>
-                                    </div>
-                                    <div class="text-muted small">
-                                        <?= e(Validator::formatSaPhone($entry['phone'])) ?>
-                                    </div>
-                                </td>
-                                <td class="message-cell">
-                                    <?= e($entry['message']) ?>
-                                </td>
-                                <td class="date-cell">
-                                    <?= e(format_relative_time($entry['created_at'])) ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+
+        <div class="entries-header">
+            <div>
+                <h1 class="entries-header__title">Inbox</h1>
+                <p class="entries-header__subtitle">
+                    <span class="entries-header__dot" aria-hidden="true"></span>
+                    <?= $total ?> submission<?= $total === 1 ? '' : 's' ?>
+                    <?php if ($totalPages > 1): ?>
+                        &middot; page <?= $page ?> of <?= $totalPages ?>
+                    <?php endif; ?>
+                </p>
             </div>
         </div>
 
+        <div class="entries-list">
+            <?php foreach ($entries as $entry): ?>
+                <article class="entry-card">
+                    <div class="entry-card__avatar" aria-hidden="true">
+                        <?= e(entry_initials($entry['name'])) ?>
+                    </div>
+
+                    <div class="entry-card__body">
+                        <div class="entry-card__top">
+                            <h2 class="entry-card__name"><?= e($entry['name']) ?></h2>
+                            <span class="entry-card__time">
+                                <?= e(format_relative_time($entry['created_at'])) ?>
+                            </span>
+                        </div>
+
+                        <div class="entry-card__contact">
+                            <a href="mailto:<?= e($entry['email']) ?>" class="entry-card__email">
+                                <?= e($entry['email']) ?>
+                            </a>
+                            <span class="entry-card__phone">
+                                <?= e(Validator::formatSaPhone($entry['phone'])) ?>
+                            </span>
+                        </div>
+
+                        <p class="entry-card__message"><?= e($entry['message']) ?></p>
+                    </div>
+                </article>
+            <?php endforeach; ?>
+        </div>
+
         <?php if ($totalPages > 1): ?>
-            <nav class="mt-4" aria-label="Pagination">
+            <nav class="entries-pagination" aria-label="Pagination">
                 <ul class="pagination justify-content-center mb-0">
                     <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
                         <a class="page-link"
@@ -183,7 +191,9 @@ require __DIR__ . '/../templates/header.php';
                 </ul>
             </nav>
         <?php endif; ?>
+
     <?php endif; ?>
+
 </div>
 
 <?php require __DIR__ . '/../templates/footer.php'; ?>

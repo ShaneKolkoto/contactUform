@@ -1,0 +1,267 @@
+.contact-split {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    background: #fff;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius-lg);
+    box-shadow: 0 4px 20px rgba(16, 24, 40, 0.04);
+    padding: 2rem;
+    margin-top: 1rem;
+}
+
+.contact-split__left {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.contact-split__right {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* ============================================================
+   Social links
+   ============================================================ */
+
+.social-links {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.75rem;
+}
+
+.social-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #344054;
+    color: #fff;
+    text-decoration: none;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.social-link:hover,
+.social-link:focus-visible {
+    background: var(--bs-primary);
+    color: #fff;
+    transform: translateY(-2px);
+    text-decoration: none;
+}
+
+.social-link svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+}
+
+/* ============================================================
+   Typography
+   ============================================================ */
+
+.contact-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #101828;
+    line-height: 1.2;
+}
+
+.contact-title span {
+    color: var(--bs-primary);
+}
+
+.contact-description {
+    color: #475467;
+    line-height: 1.7;
+    margin-bottom: 0;
+    font-size: 0.9375rem;
+}
+
+/* ============================================================
+   Form inputs inside the split card
+   ============================================================ */
+
+.contact-split .form-control {
+    background-color: #f9fafb;
+    border-color: #e4e7ec;
+    padding: 0.875rem 1rem;
+    font-size: 0.9375rem;
+}
+
+.contact-split .form-control::placeholder {
+    color: #98a2b3;
+}
+
+.contact-split .form-control:focus {
+    background-color: #fff;
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.15);
+}
+
+.contact-split .form-control.is-invalid {
+    background-color: #fef3f2;
+    border-color: #fecdca;
+}
+
+.contact-split .form-control.is-invalid:focus {
+    box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.15);
+}
+
+/* ============================================================
+   Footer row (char counter + submit button)
+   ============================================================ */
+
+.contact-split .form-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.contact-split .char-count {
+    color: #98a2b3;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ============================================================
+   Desktop layout (two columns, social on top-left)
+   ============================================================ */
+
+@media (min-width: 768px) {
+    .contact-split {
+        grid-template-columns: 1fr 1.2fr;
+        padding: 3.5rem;
+        gap: 4rem;
+    }
+
+    .contact-split__left {
+        border-right: 1px solid var(--bs-border-color);
+        padding-right: 4rem;
+    }
+}
+
+/* ============================================================
+   Mobile refinements
+   Reorders to: info → form → socials (centered, with divider)
+   ============================================================ */
+
+@media (max-width: 767px) {
+    .container--narrow.mt-4 {
+        margin-top: 0.5rem !important;
+    }
+
+    /* Switch from grid to flex so we can reorder children */
+    .contact-split {
+        display: flex;
+        flex-direction: column;
+        padding: 1.5rem;
+        gap: 1.75rem;
+        border-radius: var(--bs-border-radius);
+        margin-top: 0.5rem;
+    }
+
+    /* Dissolve the left wrapper so its children become direct
+       flex items of .contact-split and can be reordered freely */
+    .contact-split__left {
+        display: contents;
+    }
+
+    /* Order: info first */
+    .contact-info {
+        order: 1;
+    }
+
+    /* Order: form second */
+    .contact-split__right {
+        order: 2;
+    }
+
+    /* Order: socials last, centered with a divider above */
+    .social-links {
+        order: 3;
+        justify-content: center;
+        margin-top: 1rem;
+        margin-bottom: 0;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--bs-border-color);
+    }
+
+    .social-link {
+        width: 40px;
+        height: 40px;
+    }
+
+    .social-link svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .contact-title {
+        font-size: 1.5rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .contact-description {
+        font-size: 0.875rem;
+        line-height: 1.6;
+        margin-bottom: 0;
+    }
+
+    .contact-split .form-footer {
+        flex-direction: column-reverse;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .contact-split .form-footer .btn {
+        width: 100%;
+    }
+
+    .contact-split .char-count {
+        text-align: center;
+    }
+
+    .contact-split .form-control {
+        padding: 0.8125rem 0.875rem;
+    }
+}
+
+/* Very small screens */
+@media (max-width: 400px) {
+    .contact-split {
+        padding: 1.25rem;
+    }
+
+    .contact-title {
+        font-size: 1.375rem;
+    }
+}
+
+.contact-split .form-control.is-valid {
+    border-color: #12b76a;
+    background-color: #fff;
+}
+
+.contact-split .form-control.is-valid:focus {
+    border-color: #12b76a;
+    box-shadow: 0 0 0 3px rgba(18, 183, 106, 0.15);
+}
+
+/* Character counter near-limit warning */
+.contact-split .char-count.is-near-limit {
+    color: #b54708;
+    font-weight: 500;
+}
+
+.contact-split__right .alert:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.15);
+}
