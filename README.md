@@ -24,9 +24,6 @@ git clone https://github.com/ShaneKolkoto/contactUform.git
 cd contactUform
 ```
 
-Replace the URL with your actual repo URL. Then pick one of the three
-setup options below — Docker is the fastest if you have it installed.
-
 ### Prerequisites
 
 | Requirement | Version | Notes |
