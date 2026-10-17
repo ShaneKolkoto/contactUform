@@ -24,6 +24,18 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' \
     && sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' \
         /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
+# Allow .htaccess overrides in the DocumentRoot.
+# Without this, Apache ignores every .htaccess file (default is
+# AllowOverride None), which breaks extensionless URLs and our
+# sensitive-file blocks in public/.htaccess.
+RUN { \
+        echo '<Directory /var/www/html/public>'; \
+        echo '    AllowOverride All'; \
+        echo '    Require all granted'; \
+        echo '</Directory>'; \
+    } > /etc/apache2/conf-available/overrides.conf \
+ && a2enconf overrides
+
 # Development-friendly php.ini
 RUN { \
         echo 'display_errors=On'; \

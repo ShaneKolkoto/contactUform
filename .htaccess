@@ -17,6 +17,23 @@
 </IfModule>
 
 # ------------------------------------------------------------
+# Extensionless URLs
+#
+# /entries → entries.php
+# /submit  → submit.php
+# /        → index.php (DirectoryIndex default)
+#
+# Only fires when no real file or directory matches the raw path
+# AND a .php file of that name exists. So assets, uploads, and
+# static files are untouched.
+# ------------------------------------------------------------
+<IfModule mod_rewrite.c>
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME}\.php -f
+    RewriteRule ^([^\.]+)/?$ $1.php [NC,L]
+</IfModule>
+
+# ------------------------------------------------------------
 # Block sensitive file types over HTTP
 #
 # Denies: env files, SQL dumps, docs, config, logs, backups,
@@ -33,11 +50,11 @@
 </FilesMatch>
 
 # ------------------------------------------------------------
-# Block files with no extension, or dangerous extensions
-# (.php in an uploads directory could be executed)
+# Block PHP execution from any uploads directory (in case one
+# is ever added). Static files can be served, but not executed.
 # ------------------------------------------------------------
 <FilesMatch "(?i)\.(php[0-9]?|phtml|pht|phar|shtml|cgi|pl|py|rb|sh|asp|aspx|jsp)$">
-    <If "%{REQUEST_URI} =~ m#^.*/uploads/#">
+    <If "%{REQUEST_URI} =~ m#/uploads/#">
         Require all denied
     </If>
 </FilesMatch>
@@ -52,7 +69,7 @@ Options -Indexes -MultiViews
 # execution and never serve HTML from there.
 # ------------------------------------------------------------
 <IfModule mod_headers.c>
-    <If "%{REQUEST_URI} =~ m#^.*/uploads/#">
+    <If "%{REQUEST_URI} =~ m#/uploads/#">
         Header set Content-Disposition "attachment"
         Header set X-Content-Type-Options "nosniff"
     </If>
@@ -68,12 +85,3 @@ Options -Indexes -MultiViews
     # Uncomment once you've verified the CSP works for your assets:
     # Header always set Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
 </IfModule>
-
-# ------------------------------------------------------------
-# Disable PHP execution from non-public directories if this
-# .htaccess is inside the web root
-# ------------------------------------------------------------
-<FilesMatch "\.php$">
-    # This is a placeholder — real protection comes from the
-    # DocumentRoot pointing at public/. Do not rely on this alone.
-</FilesMatch>
