@@ -2,16 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * Renders a centered empty-state card.
- *
- * $props keys:
- *   icon      string   Emoji or character shown inside the circle.
- *   title     string   Required.
- *   message   string   Optional supporting text.
- *   actionUrl string   Optional URL for a CTA button.
- *   actionLabel string Optional label for the CTA button.
- */
 function render_empty_state(array $props): void
 {
     $icon = $props['icon'] ?? '';
@@ -20,7 +10,7 @@ function render_empty_state(array $props): void
     $actionUrl = $props['actionUrl'] ?? '';
     $actionLabel = $props['actionLabel'] ?? '';
     ?>
-    <div class="card">
+    <div class="card" role="status">
         <div class="empty-state">
             <?php if ($icon !== ''): ?>
                 <div class="empty-state__icon" aria-hidden="true"><?= e($icon) ?></div>

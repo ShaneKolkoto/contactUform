@@ -190,3 +190,28 @@ body {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* ============================================================
+   Accessibility — Skip to main content
+   ============================================================ */
+
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--bs-primary);
+    color: #fff;
+    padding: 0.5rem 1rem;
+    z-index: 100;
+    text-decoration: none;
+    font-weight: 600;
+    border-radius: 0 0 var(--bs-border-radius) 0;
+    transition: top 0.15s ease;
+}
+
+.skip-link:focus {
+    top: 0;
+    color: #fff;
+    outline: 2px solid #fff;
+    outline-offset: -4px;
+}

@@ -23,7 +23,7 @@ declare(strict_types=1);
 function render_form_field(array $props): void
 {
     $name = $props['name'];
-    $label = $props['label'];
+    $label = $props['label'] ?? '';
     $type = $props['type'] ?? 'text';
     $value = $props['value'] ?? '';
     $error = $props['error'] ?? '';
@@ -34,27 +34,33 @@ function render_form_field(array $props): void
     $isTextarea = $props['textarea'] ?? false;
     $rows = $props['rows'] ?? 5;
     $autocomplete = $props['autocomplete'] ?? '';
+    $hideLabel = $props['hide_label'] ?? false;
 
     $inputId = $name;
     $errorId = "{$name}-error";
     $hintId = "{$name}-hint";
 
-    // Build aria-describedby from whatever is present
     $describedBy = [];
-    if ($hint !== '') {
-        $describedBy[] = $hintId;
-    }
-    if ($error !== '') {
-        $describedBy[] = $errorId;
-    }
+    if ($hint !== '') $describedBy[] = $hintId;
+    if ($error !== '') $describedBy[] = $errorId;
 
     $classNames = 'form-control' . ($error !== '' ? ' is-invalid' : '');
     ?>
     <div class="mb-3">
-        <label for="<?= e($inputId) ?>" class="form-label">
-            <?= e($label) ?>
-            <?php if ($required): ?><span class="text-danger">*</span><?php endif; ?>
-        </label>
+        <?php if ($hideLabel): ?>
+            <label for="<?= e($inputId) ?>" class="visually-hidden">
+                <?= e($label) ?>
+                <?php if ($required): ?> (required)<?php endif; ?>
+            </label>
+        <?php else: ?>
+            <label for="<?= e($inputId) ?>" class="form-label">
+                <?= e($label) ?>
+                <?php if ($required): ?>
+                    <span class="text-danger" aria-hidden="true">*</span>
+                    <span class="visually-hidden">(required)</span>
+                <?php endif; ?>
+            </label>
+        <?php endif; ?>
 
         <?php if ($isTextarea): ?>
             <textarea
@@ -63,7 +69,8 @@ function render_form_field(array $props): void
                 class="<?= e($classNames) ?>"
                 rows="<?= (int) $rows ?>"
                 <?= $maxlength !== null ? 'maxlength="' . (int) $maxlength . '"' : '' ?>
-                <?= $required ? 'required' : '' ?>
+                <?= $placeholder !== '' ? 'placeholder="' . e($placeholder) . '"' : '' ?>
+                <?= $required ? 'required aria-required="true"' : '' ?>
                 <?= $error !== '' ? 'aria-invalid="true"' : '' ?>
                 <?= $describedBy !== [] ? 'aria-describedby="' . e(implode(' ', $describedBy)) . '"' : '' ?>
             ><?= e($value) ?></textarea>
@@ -77,7 +84,7 @@ function render_form_field(array $props): void
                 <?= $placeholder !== '' ? 'placeholder="' . e($placeholder) . '"' : '' ?>
                 <?= $maxlength !== null ? 'maxlength="' . (int) $maxlength . '"' : '' ?>
                 <?= $autocomplete !== '' ? 'autocomplete="' . e($autocomplete) . '"' : '' ?>
-                <?= $required ? 'required' : '' ?>
+                <?= $required ? 'required aria-required="true"' : '' ?>
                 <?= $error !== '' ? 'aria-invalid="true"' : '' ?>
                 <?= $describedBy !== [] ? 'aria-describedby="' . e(implode(' ', $describedBy)) . '"' : '' ?>
             >
@@ -88,7 +95,9 @@ function render_form_field(array $props): void
         <?php endif; ?>
 
         <?php if ($error !== ''): ?>
-            <div class="invalid-feedback" id="<?= e($errorId) ?>"><?= e($error) ?></div>
+            <div class="invalid-feedback" id="<?= e($errorId) ?>" role="alert">
+                <?= e($error) ?>
+            </div>
         <?php endif; ?>
     </div>
     <?php

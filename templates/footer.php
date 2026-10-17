@@ -6,7 +6,7 @@ declare(strict_types=1);
 </main>
 
 <footer class="site-footer">
-    <div class="container">
+    <div class="container text-center">
         &copy; <?= date('Y') ?> <?= e($config['app']['name']) ?>. All rights reserved.
     </div>
 </footer>
