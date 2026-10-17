@@ -284,13 +284,13 @@ require __DIR__ . '/../templates/header.php';
                     $exportQuery = $exportParams ? '?' . http_build_query($exportParams) : '';
                 ?>
                 <a href="/export<?= e($exportQuery) ?>" class="btn btn-secondary btn-sm">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.35em; vertical-align: -2px;">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    Export CSV
-                </a>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="margin-right: 0.35em; vertical-align: -2px;">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+    </svg>
+    Export CSV
+</a>
             </div>
 
             <div class="entries-list">
@@ -329,9 +329,9 @@ require __DIR__ . '/../templates/header.php';
                         <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
                             <a class="page-link"
                                href="<?= e(build_query(['page' => $page - 1])) ?>"
+                               aria-label="Previous page"
                                <?= $page <= 1 ? 'tabindex="-1" aria-disabled="true"' : '' ?>>
                                 <span aria-hidden="true">&laquo;</span>
-                                <span class="visually-hidden">Previous page</span>
                             </a>
                         </li>
 
@@ -341,6 +341,9 @@ require __DIR__ . '/../templates/header.php';
                                    href="<?= e(build_query(['page' => $i])) ?>"
                                    <?= $i === $page ? 'aria-current="page"' : '' ?>>
                                     <?= $i ?>
+                                    <?php if ($i === $page): ?>
+                                        <span class="visually-hidden">(current page)</span>
+                                    <?php endif; ?>
                                 </a>
                             </li>
                         <?php endfor; ?>
@@ -348,9 +351,9 @@ require __DIR__ . '/../templates/header.php';
                         <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
                             <a class="page-link"
                                href="<?= e(build_query(['page' => $page + 1])) ?>"
+                               aria-label="Next page"
                                <?= $page >= $totalPages ? 'tabindex="-1" aria-disabled="true"' : '' ?>>
                                 <span aria-hidden="true">&raquo;</span>
-                                <span class="visually-hidden">Next page</span>
                             </a>
                         </li>
                     </ul>
